@@ -1,0 +1,121 @@
+First of all, let us know the basic step of carrying out our analysis i.e. connecting hive to python
+Step 1 : Download Cloudera ODBC Driver for Apache Hive from https://www.cloudera.com/downloads/connectors/hive/odbc/2-6-4.html and download HiveODBC Driver 2.6.4
+Step 2 : Start installing once the installer package is downloaded
+Step 3 : During the set up stage, in System ASN, Add the Cloudera ODBC Driver
+Step 4 : Fill in the details (Data source name, host, port, mechanism, thrift transport) and test it. 
+Step 5 : If it gives you a success, you can go ahead. If not, check the details you have filled during the set up. 
+Step 6 : Open jupyter notebook and write the following commands to link hive and carry out your analysis:
+import pyodbc
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+#loading the athletes_csv dataset in python
+ with pyodbc.connect("DSN = Hive_Connection", autocommit = True) as conn:
+    df = pd.read_sql("SELECT * FROM athletes_csv", conn)
+print(df.head())
+print(df.describe())
+print(df.info())
+#loading the noc_regions dataset 
+with pyodbc.connect("DSN = Hive_Connection", autocommit = True) as conn:
+	df1 = pd.read_sql("SELECT * FROM noc_regions", conn)
+print(df1.head())
+print(df1.describe())
+print(df1.info())
+
+#Merging the 2 datasets
+with pyodbc.connect("DSN = Hive_Connection", autocommit = True) as conn:
+	merged = pd.read_sql("select athletes_csv.name, noc_regions.region FROM athletes.csv INNER JOIN noc_regions ON noc_regions.NOC = athletes_csv.NOC ", conn)
+print(merged.head())
+print(merged.describe())
+print(merged.info())
+
+#Distribution of gold medalists agewise
+with pyodbc.connect("DSN = Hive_Connection", autocommit = True) as conn:
+    gold_age = pd.read_sql("select age from olympics_120 where Medal = 'Gold' GROUP BY Age", conn)
+print(gold_age.head())
+plt.figure(figsize=(12, 6))
+plt.tight_layout()
+sns.countplot(x='Age', hue='Medal', data= gold_age)
+plt.title('Distribution of Gold Medals')
+
+#Distribution of gold medals sportwise for age more than 50 years
+with pyodbc.connect("DSN = Hive_Connection", autocommit = True) as conn:
+    gold_sport50 = pd.read_sql("select sport from olympics_120 where Medal = 'Gold' AND Age > 50" GROUP BY sport, conn)
+print(gold_sport50.head())
+plt.figure(figsize=(20, 10))
+plt.tight_layout()
+sns.countplot(x = ‘Sport’, hue = ‘Medal’, data = gold_sport50 ) 
+plt.title('Gold Medals for Athletes Over 50')
+
+#Distribution of female winners sportwise
+with pyodbc.connect("DSN = Hive_Connection", autocommit = True) as conn:
+medal_women = pd.read_sql("select count(*) from olympics_120 where sex = 'F' GROUP BY year HAVING Medal <> 'NULL'", conn)
+print(medal_women.head())
+sns.set(style="darkgrid")
+plt.figure(figsize=(20, 10))
+sns.countplot(x='Year', data=medal_women)
+plt.title('Women medals per edition of the Games')
+
+#Distribution of yearwise Indian achievements
+with pyodbc.connect("DSN = Hive_Connection", autocommit = True) as conn:
+    india_data = pd.read_sql("select * from olympics_120 where country = 'India'", conn)
+print(india_data.head())
+plt.figure(figsize=(12, 6))
+plt.tight_layout()
+sns.countplot(x='Year', hue='Medal', data= India_data)
+plt.title('Distribution of Medals')
+
+#Distribution of sportwise Indian Achievements
+plt.figure(figsize=(20, 10))
+plt.tight_layout()
+sns.countplot(x='Sport', data= India_data)
+plt.title('Distribution of Sports')
+
+#Let's create a filtered dataset for indian women:
+with pyodbc.connect("DSN = Hive_Connection", autocommit = True) as conn:
+    india_women = pd.read_sql("select * from olympics_120 where country = 'India' AND Sex = 'F'", conn)
+print(india_women.head())
+
+#Distribution of women participation per edition of games (or for each sport)
+sns.set(style="darkgrid")
+plt.figure(figsize=(20, 10))
+sns.countplot(x='Year', data=india_women)
+plt.title('Women participation per edition of the Games')
+
+#distribution of medals by year by India
+with pyodbc.connect("DSN = Hive_Connection", autocommit = True) as conn:
+    total = pd.read_sql("select * from olympics_120 where country = 'India' GROUP BY Medal HAVING Medal <> 'NULL' ORDER BY Year", conn)
+print(total.head())
+plt.figure(figsize=(20, 10))
+plt.tight_layout()
+sns.countplot(x='Medal', hue='Year', data= total)
+plt.title('Distribution of Medals by year')
+
+
+The codes given below are for hive(just the tables we want to retrieve). 
+hive:
+hive
+create table athletes_csv(ID INT, Name STRING, Age INT, Sex STRING, Height INT, Weight INT, Team STRING, NOC STRING, Games STRING, Year INT, Season STRING, City STRING, Sport STRING, Event STRING, Medal STRING) row format delimited fields terminated by ',';
+load data local inpath ‘/home/cloudera/Downloads/olympic_data.csv’ into table athletes;
+create table noc_regions(NOC STRING, region STRING) row format delimited fields terminated by ',';
+load data local inpath ‘/home/cloudera/Downloads/noc_regions.csv’ into table noc_regions;
+select athletes_csv.name, noc_regions.region FROM athletes.csv INNER JOIN noc_regions ON noc_regions.NOC = athletes_csv.NOC ;
+
+
+select age from olympics_120 where Medal = 'Gold' GROUP BY Age;
+select sport from olympics_120 where Medal = 'Gold';
+select count(*) from olympics_120 where sex = 'F' AND Medal = 'Gold' ORDER BY year;/select count(*) from olympics_120 where sex = 'F' GROUP BY year HAVING Medal = 'Gold';
+select count(*) from olympics_120 where country = 'India' AND where Medal <> NULL;
+select count(*) from olympics_120 where country = 'India' GROUP BY Sport;
+select count(edition, age) from olympics_120 where country = 'India' GROUP BY Year;
+CREATE VIEW MEDALS As SELECT Name, Team, CASE WHEN Medal = 'NULL' THEN 0 ELSE 1 END FROM olympics_120;
+Select COUNT(Team) FROM MEDALS1; 271117 teams have won till now
+
+Moving Average
+SELECT Team, Year, Medal, AVG(Medal) OVER (ORDER BY Year ROWS BETWEEN 4 preceding AND CURRENT ROW) AS Moving_Average FROM olympics_120;
+
+
+
+
+

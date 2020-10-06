@@ -1,0 +1,127 @@
+hadoop fs -copyFromLocal /home/cloudera/Desktop/mumbai25.txt
+
+pig -x mapreduce
+
+A = load 'INMUMBAI.txt' as (log:chararray);
+
+B = foreach A generate SUBSTRING(log, 1, 3) AS month, SUBSTRING(log,15,17) AS date, SUBSTRING(log,29,33) AS year, SUBSTRING(log, 42,46) as avgtemp;
+
+C = FOREACH B GENERATE *, TRIM(month) as (monthT:chararray), TRIM(date) as (dateT:chararray), TRIM(year) as (yearT:chararray), TRIM(avgtemp) as (avgtempT:chararray);
+
+D = FOREACH C GENERATE dateT,monthT,yearT,avgtempT;
+
+summer = FILTER D BY monthT IN ('3','4','5');
+
+monsoon = FILTER D BY monthT IN ('6','7','8','9');
+
+winter = FILTER D BY monthT IN ('10','11','12','1','2');
+
+
+__________________________ Working on summer data 
+
+sum_int = FOREACH summer GENERATE *,  dateT as (date:int),monthT as (month:int),yearT as (year:int),avgtempT as (avgtemp:int);
+
+sum_del = FOREACH sum_int GENERATE date,month,year,avgtemp;
+
+summer_temp = foreach sum_del generate avgtemp;
+
+summer_grouped = GROUP summer_temp ALL;
+
+summer_avg = FOREACH summer_grouped GENERATE AVG(summer_temp.avgtemp);
+
+filtered_summer = FILTER summer by avgtempT < '83.68';
+
+_________ we can see that we have -99 values propbably in place for missing values.
+
+
+summer_clean = FILTER summer by avgtempT > '-99';
+
+sum_int = FOREACH summer_clean GENERATE *,  dateT as (date:int),monthT as (month:int),yearT as (year:int),avgtempT as (avgtemp:int);
+
+sum_del = FOREACH sum_int GENERATE date,month,year,avgtemp;
+
+summer_temp = foreach sum_del generate avgtemp;
+
+summer_grouped = GROUP summer_temp ALL;
+
+summer_avg = FOREACH summer_grouped GENERATE AVG(summer_temp.avgtemp);
+
+summer_filtered = FILTER summer_clean by avgtempT < '84.3';
+
+summer_temp = foreach summer_clean generate avgtemp;
+
+grouped_summer = GROUP summer_temp ALL;
+
+summer_min = FOREACH summer_grouped GENERATE MIN(summer_temp.avgtemp);
+
+summer_max = FOREACH summer_grouped GENERATE MAX(summer_temp.avgtemp);
+
+
+____________________ Working on monsoon data 
+
+
+monsoon_clean = FILTER monsoon by avgtempT > '-99';
+
+mon_int = FOREACH monsoon_clean GENERATE *,  dateT as (date:int),monthT as (month:int),yearT as (year:int),avgtempT as (avgtemp:int);
+
+mon_del = FOREACH mon_int GENERATE date,month,year,avgtemp;
+
+monsoon_temp = foreach mon_del generate avgtemp;
+
+monsoon_grouped = GROUP monsoon_temp ALL;
+
+monsoon_avg = FOREACH monsoon_grouped GENERATE AVG(monsoon_temp.avgtemp);
+
+monsoon_filtered = FILTER monsoon_clean by avgtempT > '82.85';
+
+monsoon_temp = foreach mon_del generate avgtemp;
+
+monsoon_grouped = GROUP monsoon_temp ALL;
+
+monsoon_min = FOREACH monsoon_grouped GENERATE MIN(monsoon_temp.avgtemp);
+
+monsoon_max = FOREACH monsoon_grouped GENERATE MAX(monsoon_temp.avgtemp);
+
+ 
+___________ analysis for winter data
+
+
+
+winter_clean = FILTER winter by avgtempT > '-99';
+
+win_int = FOREACH winter_clean GENERATE *,  dateT as (date:int),monthT as (month:int),yearT as (year:int),avgtempT as (avgtemp:int);
+
+win_del = FOREACH win_int GENERATE date,month,year,avgtemp;
+
+winter_temp = foreach win_del generate avgtemp;
+
+winter_grouped = GROUP winter_temp ALL;
+
+winter_avg = FOREACH winter_grouped GENERATE AVG(winter_temp.avgtemp);
+
+winter_filtered = FILTER winter_clean by avgtempT > '80.19';
+
+winter_temp = foreach win_del generate avgtemp;
+
+winter_grouped = GROUP winter_temp ALL;
+
+winter_min = FOREACH winter_grouped GENERATE MIN(winter_temp.avgtemp);
+
+winter_max = FOREACH winter_grouped GENERATE MAX(winter_temp.avgtemp);
+
+
+
+
+___________ combining all abnormal days throughout seasons.
+
+abnormal_days = UNION summer_filtered, monsoon_filtered, winter_filtered;
+
+dump abnormal_days;
+
+describe abnormal_days;
+
+abtemp = foreach abnormal_days generate avgtempT;
+
+abgrouped = GROUP abtemp ALL;
+
+count = foreach abgrouped generate COUNT(abtemp.avgtempT);
